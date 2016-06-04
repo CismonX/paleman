@@ -7,18 +7,24 @@ use Workerman\Protocols\Http;
 require_once __DIR__ . '/function.php';
 
 function http_onWorkerStart(Worker $worker){
+    //Connect to GlobalData client.
     global $global;
     $global = new GlobalData\Client('127.0.0.1:2207');
+    //Connect to Channel client.
     Channel\Client::connect('127.0.0.1', 2206);
 }
 
 function ws_onWorkerStart(Worker $worker){
+    //Connect to GlobalData client.
     global $global;
     $global = new GlobalData\Client('127.0.0.1:2207');
+    //Connect to Channel client.
     Channel\Client::connect('127.0.0.1', 2206);
+    //Callback on Channel message. Different processes of the worker are independent.
     Channel\Client::on('send_'.$worker->id, function($data) use($worker){
-        foreach($worker->connections as $connection){
-            if($connection->timer_id == $data['timer']){
+        foreach ($worker->connections as $connection){
+            //Send to connections attached to specific timer.
+            if ($connection->timer_id == $data['timer']){
                 $connection->send($data['msg']);
             }
         }
@@ -26,6 +32,7 @@ function ws_onWorkerStart(Worker $worker){
 }
 
 function ws_onConnect(TcpConnection $connection) {
+    //Initialize 'timer_id' key on client connect.
     $connection->timer_id = -1;
     $msg = array(
         'type' => 'signal',
@@ -36,10 +43,11 @@ function ws_onConnect(TcpConnection $connection) {
 
 function ws_onMessage(TcpConnection $connection, $data){
     global $global;
-    //data: listener_id
+    //Expected data is listener_id.
     $timer_id = $global->$data['timer_id'];
+    //Attach client connection to specific timer, client only receive messages posted by the corresponding timer.
     $connection->timer_id = (int)$timer_id;
-    $msg = array(
+    $msg = array (
         'type' => 'signal',
         'data' => 'listen',
         'id' => $connection->timer_id
@@ -48,7 +56,7 @@ function ws_onMessage(TcpConnection $connection, $data){
 }
 
 function http_onMessage(TcpConnection $connection) {
-    //CORS
+    //Enable Cross-Origin Resource Sharing (CORS).
     Http::header('Access-Control-Allow-Origin: *');
     if (!isset($_POST['request']))
         goto Bad_Request;
@@ -59,30 +67,46 @@ function http_onMessage(TcpConnection $connection) {
     $operation = $request_data['operation'];
     switch ($operation) {
         case 'add':
-            //set listener id
+            $arg = array();
+            //Set listener_id using timestamp.
             $listener_id = time();
-            $arg['target'] = $request_data['target'];
-            $arg['listener'] = $listener_id;
-            //add globaldata
+            //Data to be delivered to initialization function and timer function.
+            foreach($request_data['args'] as $argument) {
+                $arg[$argument] = $request_data[$argument];
+            }
             $global->add($listener_id, array());
-            //initialize
-            call_user_func_array($request_data['init'], $arg);
-            $timer_id = Timer::add(
-                $request_data['interval'],
-                'timer_callback',
-                array($request_data['timer'], $arg)
+            //Call user-defined initialization function.
+            //The first is a user-defined array. The second is listener_id, which can be used to access GlobalData.
+            call_user_func($request_data['init'], $arg, $listener_id);
+            //Add timer.
+            $timer_id = Timer::add ($request_data['interval'],
+                function (callable $timer_func, $args, $listener_id) use(&$timer_id){
+                    //User-defined timer function should have two arguments.
+                    //The first is a user-defined array. The second is listener_id, which can be used to access GlobalData.
+                    $send_data['msg'] = call_user_func($timer_func, $args, $listener_id);
+                    $send_data['timer'] = $timer_id;
+                    //When Timer function return without having to send message to client, return false.
+                    if($send_data === false)
+                        return;
+                    //Send message to client. Different processes of a Worker are independent.
+                    for($worker = 0; $worker < 4; $worker++){
+                        Channel\Client::publish('send_'.$worker, $send_data);
+                    }
+                }, array($request_data['timer'], $arg, $listener_id)
             );
+            //Store timer_id to GlobalData (atomic operation).
             do {
                 $old_listener = $new_listener = $global->$listener_id;
                 $new_listener['timer_id'] = $timer_id;
             } while (!$global->cas($listener_id, $old_listener, $new_listener));
-            //return: listener_id, interval, type, target
+            //Default return data.
             $return_data['listener_id'] = $listener_id;
             $return_data['interval'] = $request_data['interval'];
-            foreach($request_data['return'] as $return){
+            //User-defined data to be returned to Control Panel.
+            foreach($request_data['return'] as $return) {
                 $return_data[$return] = $request_data[$return];
             }
-            $msg = array(
+            $msg = array (
                 'type' => 'msg',
                 'data' => $return_data
             );
@@ -91,11 +115,19 @@ function http_onMessage(TcpConnection $connection) {
         case 'del';
             $listener_id = $request_data['listener_id'];
             global $global;
+            //Check whether the listener exists.
+            if(!isset($global->$listener_id['timer_id'])) {
+                $del = false;
+                goto Send;
+            }
+            //Delete Timer.
             $del = Timer::del($global->$listener_id['timer_id']);
+            //Free GlobalData.
             unset($global->$listener_id);
-            $msg = array(
+            Send:
+            $msg = array (
                 'type' => 'msg',
-                'data' => array(
+                'data' => array (
                     'id' => $listener_id,
                     'status' => (int)$del
                 )
@@ -107,10 +139,9 @@ function http_onMessage(TcpConnection $connection) {
     }
     return;
     Bad_Request:
-    $msg = array(
+    $msg = array (
         'type' => 'err',
         'data' => 'Bad Request'
     );
     $connection->send(json_encode($msg));
 }
-
