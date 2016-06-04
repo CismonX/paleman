@@ -16,9 +16,9 @@ function parse_request($request_str) {
                 return false;
             $request['interval'] = (int)$request_arr[1];
             break;
-        //Format: <operation_type> <listener_id>
+        //Format: <operation_type> <task_id>
         case 'del':
-            $request['listener_id'] = $request_arr[1];
+            $request['task_id'] = $request_arr[1];
             break;
         default:
             return false;
