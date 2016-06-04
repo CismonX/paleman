@@ -43,7 +43,7 @@ function ws_onConnect(TcpConnection $connection) {
 
 function ws_onMessage(TcpConnection $connection, $data){
     global $global;
-    //Expected data is listener_id.
+    //Expected data is task_id.
     $timer_id = $global->$data['timer_id'];
     //Attach client connection to specific timer, client only receive messages posted by the corresponding timer.
     $connection->timer_id = (int)$timer_id;
@@ -68,22 +68,22 @@ function http_onMessage(TcpConnection $connection) {
     switch ($operation) {
         case 'add':
             $arg = array();
-            //Set listener_id using timestamp.
-            $listener_id = time();
+            //Set task_id.
+            $task_id = uniqid();
             //Data to be delivered to initialization function and timer function.
             foreach($request_data['args'] as $argument) {
                 $arg[$argument] = $request_data[$argument];
             }
-            $global->add($listener_id, array());
+            $global->add($task_id, array());
             //Call user-defined initialization function.
-            //The first is a user-defined array. The second is listener_id, which can be used to access GlobalData.
-            call_user_func($request_data['init'], $arg, $listener_id);
+            //The first is a user-defined array. The second is task_id, which can be used to access GlobalData.
+            call_user_func($request_data['init'], $arg, $task_id);
             //Add timer.
             $timer_id = Timer::add ($request_data['interval'],
-                function (callable $timer_func, $args, $listener_id) use(&$timer_id){
+                function (callable $timer_func, $args, $task_id) use(&$timer_id){
                     //User-defined timer function should have two arguments.
-                    //The first is a user-defined array. The second is listener_id, which can be used to access GlobalData.
-                    $send_data['msg'] = call_user_func($timer_func, $args, $listener_id);
+                    //The first is a user-defined array. The second is task_id, which can be used to access GlobalData.
+                    $send_data['msg'] = call_user_func($timer_func, $args, $task_id);
                     $send_data['timer'] = $timer_id;
                     //When Timer function return without having to send message to client, return false.
                     if($send_data === false)
@@ -92,15 +92,15 @@ function http_onMessage(TcpConnection $connection) {
                     for($worker = 0; $worker < 4; $worker++){
                         Channel\Client::publish('send_'.$worker, $send_data);
                     }
-                }, array($request_data['timer'], $arg, $listener_id)
+                }, array($request_data['timer'], $arg, $task_id)
             );
             //Store timer_id to GlobalData (atomic operation).
             do {
-                $old_listener = $new_listener = $global->$listener_id;
-                $new_listener['timer_id'] = $timer_id;
-            } while (!$global->cas($listener_id, $old_listener, $new_listener));
+                $old_task = $new_task = $global->$task_id;
+                $new_task['timer_id'] = $timer_id;
+            } while (!$global->cas($task_id, $old_task, $new_task));
             //Default return data.
-            $return_data['listener_id'] = $listener_id;
+            $return_data['task_id'] = $task_id;
             $return_data['interval'] = $request_data['interval'];
             //User-defined data to be returned to Control Panel.
             foreach($request_data['return'] as $return) {
@@ -113,22 +113,22 @@ function http_onMessage(TcpConnection $connection) {
             $connection->send(json_encode($msg));
             break;
         case 'del';
-            $listener_id = $request_data['listener_id'];
+            $task_id = $request_data['task_id'];
             global $global;
-            //Check whether the listener exists.
-            if(!isset($global->$listener_id['timer_id'])) {
+            //Check whether the task_id exists.
+            if(!isset($global->$task_id['timer_id'])) {
                 $del = false;
                 goto Send;
             }
             //Delete Timer.
-            $del = Timer::del($global->$listener_id['timer_id']);
+            $del = Timer::del($global->$task_id['timer_id']);
             //Free GlobalData.
-            unset($global->$listener_id);
+            unset($global->$task_id);
             Send:
             $msg = array (
                 'type' => 'msg',
                 'data' => array (
-                    'id' => $listener_id,
+                    'id' => $task_id,
                     'status' => (int)$del
                 )
             );
