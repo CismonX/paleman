@@ -2,4 +2,4 @@ A PHP framework based on Workerman. Can be used to execute several timed tasks s
 
 Notice: Workerman and its derivatives (Channel, GlobalData) are required.
 
-This project is under construction, therfore there's no manual so far. :)
+This project is under construction, therefore there's no manual so far. :)
