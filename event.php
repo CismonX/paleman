@@ -1,4 +1,5 @@
 <?php
+
 use Workerman\Worker;
 use Workerman\Connection\TcpConnection;
 use Workerman\Lib\Timer;
@@ -6,25 +7,17 @@ use Workerman\Protocols\Http;
 
 require_once __DIR__ . '/function.php';
 
-function http_onWorkerStart(Worker $worker){
-    //Connect to GlobalData client.
-    global $global;
-    $global = new GlobalData\Client('127.0.0.1:2207');
-    //Connect to Channel client.
-    Channel\Client::connect('127.0.0.1', 2206);
-}
-
 function ws_onWorkerStart(Worker $worker){
-    //Connect to GlobalData client.
+    //Connect to GlobalData server.
     global $global;
-    $global = new GlobalData\Client('127.0.0.1:2207');
+    $global = new GlobalData\Client(GLOBALDATA_ADDR.':'.GLOBALDATA_PORT);
     //Connect to Channel client.
-    Channel\Client::connect('127.0.0.1', 2206);
+    Channel\Client::connect(CHANNEL_ADDR, CHANNEL_PORT);
     //Callback on Channel message. Different processes of the worker are independent.
-    Channel\Client::on('send_'.$worker->id, function($data) use($worker){
-        foreach ($worker->connections as $connection){
-            //Send to connections attached to specific timer.
-            if ($connection->timer_id == $data['timer']){
+    Channel\Client::on ('send', function($data) use($worker) {
+        foreach ($worker->connections as $connection) {
+            //Send to connections attached to specific task.
+            if ($connection->task_id == $data['task']){
                 $connection->send($data['msg']);
             }
         }
@@ -32,79 +25,194 @@ function ws_onWorkerStart(Worker $worker){
 }
 
 function ws_onConnect(TcpConnection $connection) {
-    //Initialize 'timer_id' key on client connect.
-    $connection->timer_id = -1;
-    $msg = array(
+    $connection->task_id = null;
+    $msg = array (
         'type' => 'signal',
         'data' => 'connected'
     );
     $connection->send(json_encode($msg));
 }
 
-function ws_onMessage(TcpConnection $connection, $data){
-    global $global;
-    //Expected data is task_id.
-    $timer_id = $global->$data['timer_id'];
-    //Attach client connection to specific timer, client only receive messages posted by the corresponding timer.
-    $connection->timer_id = (int)$timer_id;
+function ws_onMessage(TcpConnection $connection, $data) {
+    $data_arr = json_decode($data, true);
+    //Data format: 'request_str' => $request_str, 'verify_str' => $verify_str.
+    if (!isset($data_arr['request'])) {
+        $msg = array (
+            'type' => 'err',
+            'data' => 'Invalid request.',
+        );
+        goto Send;
+    };
+    $request_data = $data_arr['request'];
+    if (is_callable('ws_connection_verify') && isset($data_arr['verify_str'])) {
+        $verify_data = $data_arr['verify_str'];
+        $verify = call_user_func('ws_connection_verify', $request_data, $verify_data);
+    } else {
+        echo "Warning: No verification function specified.\n";
+        $verify = $request_data;
+    }
+    if (isset($verify['err'])) {
+        $msg = array (
+            'type' => 'err',
+            'data' => $verify['err']
+        );
+        goto Send;
+    }
+    //Attach client connection to specific task, client only receive messages posted by the corresponding task.
+    $connection->task_id = $verify['task_id'];
     $msg = array (
         'type' => 'signal',
         'data' => 'listen',
-        'id' => $connection->timer_id
+        'id' => $connection->task_id
     );
+    Send:
     $connection->send(json_encode($msg));
+}
+
+function task_onWorkerStart(Worker $worker) {
+    //Connect to GlobalData server.
+    global $global;
+    $global = new GlobalData\Client(GLOBALDATA_ADDR.':'.GLOBALDATA_PORT);
+    //Connect to Channel client.
+    Channel\Client::connect(CHANNEL_ADDR, CHANNEL_PORT);
+    //Register Channel events.
+    Channel\Client::on ('add_'.$worker->id, function($data) use($worker) {
+        $task_id = $data['task_id'];
+        //Data to be delivered to initialization function and timer function.
+        $arg_list = array_merge (
+            DEFAULT_ARGS_ADD,
+            isset($data['args']) ? $data['args'] : array()
+        );
+        $arg = array();
+        foreach($arg_list as $argument) {
+            $arg[$argument] = $data[$argument];
+        }
+        //Call user-defined initialization function if exist.
+        if (isset($data['init'])) {
+            $init_func = $data['init'];
+            if (!is_callable($init_func)) {
+                echo "Error: Initialization function not callable.\n";
+                setGlobalData($task_id);
+                return;
+            }
+            //User-defined initialization function should have two arguments.
+            //The first is a user-defined array. The second is task_id, which can be used to access GlobalData.
+            $init = call_user_func($init_func, $arg, $task_id);
+            //If error occurs in Initialization function, terminate current task.
+            if (isset($init['err'])) {
+                echo $init['err'];
+                setGlobalData($task_id);
+                return;
+            }
+            if($init !== true) {
+                $arg['init'] = $init;
+            }
+        }
+        //Store timer function callback in GlobalData.
+        if (isset($data['timer'])) {
+            setGlobalData($task_id, 'timer_func', $data['timer']);
+        }
+        //Add timer.
+        $timer_id = Timer::add ($data['interval'],
+            function ($args, $task_id) use(&$timer_id){
+                //User-defined timer function should have two arguments.
+                //The first is a user-defined array. The second is task_id, which can be used to access GlobalData.
+                $timer_func = getGlobalData($task_id, 'timer_func');
+                if ($timer_func === null)
+                    return;
+                if (!is_callable($timer_func)) {
+                    echo "Error: Timer function not callable.\n";
+                    return;
+                }
+                $msg = call_user_func($timer_func, $args, $task_id);
+                //When Timer function return without having to send message to client, return true.
+                if ($msg === true)
+                    return;
+                $send_data['msg'] = $msg;
+                $send_data['task'] = $task_id;
+                //Send message to client.
+                Channel\Client::publish('send', $send_data);
+            }, array($arg, $task_id)
+        );
+        setGlobalData($task_id, 'timer_id', $timer_id);
+        setGlobalData($task_id, 'worker_id', $worker->id);
+    });
+    Channel\Client::on ('cfg_'.$worker->id, function($data) use($worker) {
+        //Data to be delivered to Configure function and timer function.
+        $arg_list = array_merge(DEFAULT_ARGS_CFG, $data['args']);
+        $arg = array();
+        foreach($arg_list as $argument) {
+            $arg[$argument] = $data[$argument];
+        }
+        if (isset($data['cfg_func'])) {
+            $cfg_func = $data['cfg_func'];
+            if(!is_callable($cfg_func)) {
+                echo "Error: Configuration function not callable.\n";
+                return;
+            }
+            call_user_func($cfg_func, $arg);
+        }
+    });
+    Channel\Client::on ('del_'.$worker->id, function($data) use($worker) {
+        $task_id = $data['task_id'];
+        $timer_id = $data['timer_id'];
+        $func = $data['task_name'].'_on_delete';
+        //Call a function before dying. The function is expected to have one argument: task_id.
+        if (is_callable($func)) {
+            call_user_func($func, $task_id);
+        }
+        Timer::del($timer_id);
+        //Free GlobalData.
+        setGlobalData($task_id);
+    });
+}
+
+function http_onWorkerStart(){
+    //Connect to GlobalData server.
+    global $global;
+    $global = new GlobalData\Client(GLOBALDATA_ADDR.':'.GLOBALDATA_PORT);
+    //Connect to Channel client.
+    Channel\Client::connect(CHANNEL_ADDR, CHANNEL_PORT);
 }
 
 function http_onMessage(TcpConnection $connection) {
     //Enable Cross-Origin Resource Sharing (CORS).
-    Http::header('Access-Control-Allow-Origin: *');
-    if (!isset($_POST['request']))
-        goto Bad_Request;
+    Http::header('Access-Control-Allow-Origin: '.CORS_DOMAIN);
+    if (!isset($_POST['request'])) {
+        $request_data['err'] = 'Bad Request.';
+        goto err;
+    }
     $request_data = parse_request($_POST['request']);
-    if ($request_data === false)
-        goto Bad_Request;
     global $global;
     $operation = $request_data['operation'];
     switch ($operation) {
         case 'add':
-            $arg = array();
             //Set task_id.
             $task_id = uniqid();
-            //Data to be delivered to initialization function and timer function.
-            foreach($request_data['args'] as $argument) {
-                $arg[$argument] = $request_data[$argument];
-            }
+            $request_data['task_id'] = $task_id;
             $global->add($task_id, array());
-            //Call user-defined initialization function.
-            //The first is a user-defined array. The second is task_id, which can be used to access GlobalData.
-            call_user_func($request_data['init'], $arg, $task_id);
-            //Add timer.
-            $timer_id = Timer::add ($request_data['interval'],
-                function (callable $timer_func, $args, $task_id) use(&$timer_id){
-                    //User-defined timer function should have two arguments.
-                    //The first is a user-defined array. The second is task_id, which can be used to access GlobalData.
-                    $send_data['msg'] = call_user_func($timer_func, $args, $task_id);
-                    $send_data['timer'] = $timer_id;
-                    //When Timer function return without having to send message to client, return false.
-                    if($send_data === false)
-                        return;
-                    //Send message to client. Different processes of a Worker are independent.
-                    for($worker = 0; $worker < 4; $worker++){
-                        Channel\Client::publish('send_'.$worker, $send_data);
-                    }
-                }, array($request_data['timer'], $arg, $task_id)
+            if(!isset($request_data['interval'])) {
+                //Default 60 seconds interval if not specified.
+                $request_data['interval'] = 60;
+            }
+            //Select a random worker if not specified.
+            if (!isset($request_data['worker_id'])) {
+                mt_srand();
+                $request_data['worker_id'] = mt_rand(0, TASK_WORKER_COUNT - 1);
+            }
+            elseif ($request_data['worker_id'] < 0 || $request_data['worker_id'] >= TASK_WORKER_COUNT) {
+                $request_data['err'] = 'Invalid worker ID';
+                goto err;
+            }
+            Channel\Client::publish ('add_'.$request_data['worker_id'], $request_data);
+            //Return data to Control Panel.
+            $return_list = array_merge(
+                isset($request_data['return']) ? $request_data['return'] : array(),
+                DEFAULT_RETURN_ADD
             );
-            //Store timer_id to GlobalData (atomic operation).
-            do {
-                $old_task = $new_task = $global->$task_id;
-                $new_task['timer_id'] = $timer_id;
-            } while (!$global->cas($task_id, $old_task, $new_task));
-            //Default return data.
-            $return_data['task_id'] = $task_id;
-            $return_data['interval'] = $request_data['interval'];
-            //User-defined data to be returned to Control Panel.
-            foreach($request_data['return'] as $return) {
-                $return_data[$return] = $request_data[$return];
+            $return_data = array();
+            foreach ($return_list as $return_msg) {
+                $return_data[$return_msg] = $request_data[$return_msg];
             }
             $msg = array (
                 'type' => 'msg',
@@ -112,36 +220,51 @@ function http_onMessage(TcpConnection $connection) {
             );
             $connection->send(json_encode($msg));
             break;
-        case 'del';
-            $task_id = $request_data['task_id'];
-            global $global;
-            //Check whether the task_id exists.
-            if(!isset($global->$task_id['timer_id'])) {
-                $del = false;
-                goto Send;
+        case 'cfg':
+            //Select a random worker if not specified.
+            //In some cases,
+            if (!isset($request_data['worker_id'])) {
+                mt_srand();
+                $request_data['worker_id'] = mt_rand(0, TASK_WORKER_COUNT - 1);
             }
-            //Delete Timer.
-            $del = Timer::del($global->$task_id['timer_id']);
-            //Free GlobalData.
-            unset($global->$task_id);
-            Send:
+            if ($request_data['worker_id'])
+            Channel\Client::publish ('cfg_'.$request_data['worker_id'], $request_data);
+            //Return data to Control Panel.
+            $return_list = array_merge($request_data['return'], DEFAULT_RETURN_CFG);
+            $return_data = array();
+            foreach ($return_list as $return_msg) {
+                $return_data[$return_msg] = $request_data[$return_msg];
+            }
+            $msg = array (
+                'type' => 'msg',
+                'data' => $return_data
+            );
+            $connection->send(json_encode($msg));
+            break;
+            break;
+        case 'del':
+            $worker_id = $request_data['worker_id'];
+            $task_id = $request_data['task_id'];
+            $task_name = $request_data['task_name'];
+            Channel\Client::publish ('del_'.$worker_id, $request_data);
             $msg = array (
                 'type' => 'msg',
                 'data' => array (
-                    'id' => $task_id,
-                    'status' => (int)$del
+                    'worker' => $worker_id,
+                    'task' => $task_id,
+                    'type' => $task_name
                 )
             );
             $connection->send(json_encode($msg));
             break;
-        default:
-            goto Bad_Request;
+        case 'err':
+            goto err;
     }
     return;
-    Bad_Request:
+    err:
     $msg = array (
         'type' => 'err',
-        'data' => 'Bad Request'
+        'data' => $request_data['err']
     );
     $connection->send(json_encode($msg));
 }
