@@ -51,7 +51,7 @@ function parse_request($request_str) {
                 $request['err'] = 'Invalid arguments.';
                 break;
             }
-            $data = getGlobalData($request_arr[1], array('timer_id', 'worker_id', 'task_name'));
+            $data = getGlobalData_array($request_arr[1], array('timer_id', 'worker_id', 'task_name'));
             if ($data === false) {
                 $operation = 'err';
                 $request_arr[1] = addslashes($request_arr[1]);
@@ -76,8 +76,6 @@ function getGlobalData($task_id, $key) {
     global $global;
     if(!isset($global->$task_id))
         return false;
-    if(!isset($global->$task_id[$key]))
-        return null;
     $data = $global->$task_id[$key];
     return $data;
 }
