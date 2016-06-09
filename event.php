@@ -134,6 +134,7 @@ function task_onWorkerStart(Worker $worker) {
                 Channel\Client::publish('send', $send_data);
             }, array($arg, $task_id)
         );
+        setGlobalData($task_id, 'task_name', $data['task_name']);
         setGlobalData($task_id, 'timer_id', $timer_id);
         setGlobalData($task_id, 'worker_id', $worker->id);
     });
