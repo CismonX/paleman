@@ -1,40 +1,50 @@
 <?php
 
+require_once __DIR__ . '/config.php';
+
 use \Workerman\Worker;
 use \Workerman\WebServer;
 use \Workerman\Autoloader;
 
-require_once __DIR__ . '/Workerman/Autoloader.php';
-require_once __DIR__ . '/Workerman/Lib/Channel/Server.php';
-require_once __DIR__ . '/Workerman/Lib/GlobalData/Server.php';
+require_once WORKERMAN_PATH . '/Autoloader.php';
+require_once WORKERMAN_PATH . '/Lib/Channel/Server.php';
+require_once WORKERMAN_PATH . '/Lib/GlobalData/Server.php';
 
-Autoloader::setRootPath(__DIR__);
+Autoloader::setRootPath(AUTOLOADER_ROOT_PATH);
 
 //Initialize web Server
-$web_server = new WebServer('http://0.0.0.0:80');
+$web_server = new WebServer('http://0.0.0.0:'.WEB_PORT);
 $web_server->count = 4;
 //Path for host documents.
-$web_server->addRoot('', __DIR__.'/../Application/web');
+$web_server->addRoot('', WEB_PATH);
 
 //Initialize Channel Server
-$channel_server = new Channel\Server('0.0.0.0', 2206);
+$channel_server = new Channel\Server('0.0.0.0', CHANNEL_PORT);
 //Initialize GlobalData Server
-$global_server = new GlobalData\Server('0.0.0.0', 2207);
+$global_server = new GlobalData\Server('0.0.0.0', GLOBALDATA_PORT);
 
 require_once __DIR__ . '/event.php';
 
-//Initialize WebSocket Worker.
-$ws_worker = new Worker('websocket://0.0.0.0:2000');
-$ws_worker->count = 4;
-$ws_worker->onWorkerStart = 'ws_onWorkerStart';
-$ws_worker->onConnect = 'ws_onConnect';
-$ws_worker->onMessage = 'ws_onMessage';
+//Initialize Send Worker.
+$send_worker = new Worker('websocket://0.0.0.0:'.SEND_PORT);
+$send_worker->count = SEND_WORKER_COUNT;
+$send_worker->name = 'Send Worker';
+$send_worker->onWorkerStart = 'ws_onWorkerStart';
+$send_worker->onConnect = 'ws_onConnect';
+$send_worker->onMessage = 'ws_onMessage';
 
-//Initialize HTTP Worker.
-$http_worker = new Worker('http://0.0.0.0:2001');
-$http_worker->count = 4;
-$http_worker->onWorkerStart = 'http_onWorkerStart';
-$http_worker->onMessage = 'http_onMessage';
+//Initialize Task Worker.
+$task_worker = new Worker();
+$task_worker->count = TASK_WORKER_COUNT;
+$task_worker->name = 'Task Worker';
+$task_worker->onWorkerStart = 'task_onWorkerStart';
+
+//Initialize Control Worker.
+$ctrl_worker = new Worker('http://0.0.0.0:'.CONTROL_PORT);
+$ctrl_worker->count = CONTROL_WORKER_COUNT;
+$ctrl_worker->name = 'Control Worker';
+$ctrl_worker->onWorkerStart = 'http_onWorkerStart';
+$ctrl_worker->onMessage = 'http_onMessage';
 
 //Start Workerman.
 Worker::runAll();
