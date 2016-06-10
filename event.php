@@ -216,7 +216,7 @@ function http_onMessage(TcpConnection $connection) {
                 $return_data[$return_msg] = $request_data[$return_msg];
             }
             $msg = array (
-                'type' => 'msg',
+                'type' => 'add',
                 'data' => $return_data
             );
             $connection->send(json_encode($msg));
@@ -237,7 +237,7 @@ function http_onMessage(TcpConnection $connection) {
                 $return_data[$return_msg] = $request_data[$return_msg];
             }
             $msg = array (
-                'type' => 'msg',
+                'type' => 'cfg',
                 'data' => $return_data
             );
             $connection->send(json_encode($msg));
@@ -249,7 +249,7 @@ function http_onMessage(TcpConnection $connection) {
             $task_name = $request_data['task_name'];
             Channel\Client::publish ('del_'.$worker_id, $request_data);
             $msg = array (
-                'type' => 'msg',
+                'type' => 'del',
                 'data' => array (
                     'worker' => $worker_id,
                     'task' => $task_id,
