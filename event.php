@@ -15,10 +15,14 @@ function ws_onWorkerStart(Worker $worker){
     Channel\Client::connect(CHANNEL_ADDR, CHANNEL_PORT);
     //Callback on Channel message. Different processes of the worker are independent.
     Channel\Client::on ('send', function($data) use($worker) {
+        $msg = array (
+            'type' => 'msg',
+            'data' => $data['msg']
+        );
         foreach ($worker->connections as $connection) {
             //Send to connections attached to specific task.
             if ($connection->task_id == $data['task']){
-                $connection->send($data['msg']);
+                $connection->send(json_encode($msg));
             }
         }
     });
@@ -113,45 +117,48 @@ function task_onWorkerStart(Worker $worker) {
             setGlobalData($task_id, 'timer_func', $data['timer']);
         }
         //Add timer.
-        $timer_id = Timer::add ($data['interval'],
-            function ($args, $task_id) use(&$timer_id){
-                //User-defined timer function should have two arguments.
-                //The first is a user-defined array. The second is task_id, which can be used to access GlobalData.
-                $timer_func = getGlobalData($task_id, 'timer_func');
-                if ($timer_func === null)
-                    return;
-                if (!is_callable($timer_func)) {
-                    echo "Error: Timer function not callable.\n";
-                    return;
-                }
-                $msg = call_user_func($timer_func, $args, $task_id);
-                //When Timer function return without having to send message to client, return true.
-                if ($msg === true)
-                    return;
-                $send_data['msg'] = $msg;
-                $send_data['task'] = $task_id;
-                //Send message to client.
-                Channel\Client::publish('send', $send_data);
-            }, array($arg, $task_id)
-        );
+        if ($data['interval'])
+            $timer_id = Timer::add ($data['interval'],
+                function ($args, $task_id) use(&$timer_id){
+                    //User-defined timer function should have two arguments.
+                    //The first is a user-defined array. The second is task_id, which can be used to access GlobalData.
+                    $timer_func = getGlobalData($task_id, 'timer_func');
+                    if ($timer_func === null)
+                        return;
+                    if (!is_callable($timer_func)) {
+                        echo "Error: Timer function not callable.\n";
+                        return;
+                    }
+                    $msg = call_user_func($timer_func, $args, $task_id);
+                    //When Timer function return without having to send message to client, return true.
+                    if ($msg === true)
+                        return;
+                    $send_data['msg'] = $msg;
+                    $send_data['task'] = $task_id;
+                    //Send message to client.
+                    Channel\Client::publish('send', $send_data);
+                }, array($arg, $task_id)
+            );
+        else
+            $timer_id = -1;
         setGlobalData($task_id, 'task_name', $data['task_name']);
         setGlobalData($task_id, 'timer_id', $timer_id);
         setGlobalData($task_id, 'worker_id', $worker->id);
     });
-    Channel\Client::on ('cfg_'.$worker->id, function($data) use($worker) {
+    Channel\Client::on ('set_'.$worker->id, function($data) use($worker) {
         //Data to be delivered to Configure function and timer function.
-        $arg_list = array_merge(DEFAULT_ARGS_CFG, $data['args']);
+        $arg_list = array_merge(DEFAULT_ARGS_SET, $data['args']);
         $arg = array();
         foreach($arg_list as $argument) {
             $arg[$argument] = $data[$argument];
         }
-        if (isset($data['cfg_func'])) {
-            $cfg_func = $data['cfg_func'];
-            if(!is_callable($cfg_func)) {
+        if (isset($data['set_func'])) {
+            $set_func = $data['set_func'];
+            if(!is_callable($set_func)) {
                 echo "Error: Configuration function not callable.\n";
                 return;
             }
-            call_user_func($cfg_func, $arg);
+            call_user_func($set_func, $arg);
         }
     });
     Channel\Client::on ('del_'.$worker->id, function($data) use($worker) {
@@ -193,8 +200,8 @@ function http_onMessage(TcpConnection $connection) {
             $request_data['task_id'] = $task_id;
             $global->add($task_id, array());
             if(!isset($request_data['interval'])) {
-                //Default 60 seconds interval if not specified.
-                $request_data['interval'] = 60;
+                //Never call timer function if not specified.
+                $request_data['interval'] = 0;
             }
             //Select a random worker if not specified.
             if (!isset($request_data['worker_id'])) {
@@ -221,23 +228,22 @@ function http_onMessage(TcpConnection $connection) {
             );
             $connection->send(json_encode($msg));
             break;
-        case 'cfg':
+        case 'set':
             //Select a random worker if not specified.
-            //In some cases,
             if (!isset($request_data['worker_id'])) {
                 mt_srand();
                 $request_data['worker_id'] = mt_rand(0, TASK_WORKER_COUNT - 1);
             }
             if ($request_data['worker_id'])
-            Channel\Client::publish ('cfg_'.$request_data['worker_id'], $request_data);
+            Channel\Client::publish ('set_'.$request_data['worker_id'], $request_data);
             //Return data to Control Panel.
-            $return_list = array_merge($request_data['return'], DEFAULT_RETURN_CFG);
+            $return_list = array_merge($request_data['return'], DEFAULT_RETURN_SET);
             $return_data = array();
             foreach ($return_list as $return_msg) {
                 $return_data[$return_msg] = $request_data[$return_msg];
             }
             $msg = array (
-                'type' => 'cfg',
+                'type' => 'set',
                 'data' => $return_data
             );
             $connection->send(json_encode($msg));
