@@ -73,7 +73,7 @@ class Process {
      *
      * @param string $str - status descriptor
      *
-     * @return mixed status
+     * @return mixed - status
      */
     function __get($str) {
         if(isset($this->res)) {
