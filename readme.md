@@ -1,1 +1,1 @@
-This project is based on Workerman. Extract Workerman to its current directory before use.
+This project is based on Workerman. Extract Workerman.zip to its current directory before use.
