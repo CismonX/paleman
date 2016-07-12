@@ -2,7 +2,7 @@
 /**
  * Lib/GlobalData.php
  *
- * Use GlobalData Client to access data stored on GlobalData server.
+ * Use GlobalData client to access data stored on GlobalData server.
  * Remind that PHP global variables is only available within the process.
  * Furthermore, it is recommended that you use redis or ssdb when data is large or data operation is frequent.
  */
@@ -77,7 +77,7 @@ function setGlobalData($task_id, $key = null, $data = null) {
  *
  * @return bool
  */
-function setGlobalData_array($task_id, array $data = array()) {
+function setGlobalData_array($task_id, array $data = []) {
     global $global;
     if (!isset($global->$task_id))
         return false;
