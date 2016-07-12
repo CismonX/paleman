@@ -36,17 +36,17 @@ class Process {
                 break;
             case self::TYPE:
                 if ($value == self::PIPE)
-                    $this->descriptor_spec = array(
+                    $this->descriptor_spec = [
                         0 => array('pipe', 'r'),
                         1 => array('pipe', 'w')
-                    );
+                    ];
                 elseif ($value == self::PTY)
                     //To execute command in pty, PHP_CAN_DO_PTS must be enabled before PHP compile.
                     //See ext/standard/proc_open.c in PHP source directory.
-                    $this->descriptor_spec = array(
+                    $this->descriptor_spec = [
                         0 => array('pty'),
                         1 => array('pty')
-                    );
+                    ];
                 break;
             case self::ON_MESSAGE:
                 /**
