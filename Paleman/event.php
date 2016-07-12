@@ -13,10 +13,10 @@ function ws_onWorkerStart(Worker $worker){
     Channel\Client::connect(CHANNEL_ADDR, CHANNEL_PORT);
     //Callback on Channel message. Different processes of the worker are independent.
     Channel\Client::on ('send', function($data) use($worker) {
-        $msg = array (
+        $msg = [
             'type' => 'msg',
             'data' => $data['msg']
-        );
+        ];
         foreach ($worker->connections as $connection) {
             //Send to connections attached to specific task.
             if ($connection->task_id == $data['task']){
@@ -28,10 +28,10 @@ function ws_onWorkerStart(Worker $worker){
 
 function ws_onConnect(TcpConnection $connection) {
     $connection->task_id = null;
-    $msg = array (
+    $msg = [
         'type' => 'signal',
         'data' => 'connected'
-    );
+    ];
     $connection->send(json_encode($msg));
 }
 
@@ -39,10 +39,10 @@ function ws_onMessage(TcpConnection $connection, $data) {
     $data_arr = json_decode($data, true);
     //Data format: 'request_str' => $request_str, 'verify_str' => $verify_str.
     if (!isset($data_arr['request'])) {
-        $msg = array (
+        $msg = [
             'type' => 'err',
-            'data' => 'Invalid request.',
-        );
+            'data' => 'Invalid request.'
+        ];
         goto Send;
     };
     $request_data = $data_arr['request'];
@@ -54,19 +54,19 @@ function ws_onMessage(TcpConnection $connection, $data) {
         $verify = $request_data;
     }
     if (isset($verify['err'])) {
-        $msg = array (
+        $msg = [
             'type' => 'err',
             'data' => $verify['err']
-        );
+        ];
         goto Send;
     }
     //Attach client connection to specific task, client only receive messages posted by the corresponding task.
     $connection->task_id = $verify['task_id'];
-    $msg = array (
+    $msg = [
         'type' => 'signal',
         'data' => 'listen',
         'id' => $connection->task_id
-    );
+    ];
     Send:
     $connection->send(json_encode($msg));
 }
@@ -83,9 +83,9 @@ function task_onWorkerStart(Worker $worker) {
         //Data to be delivered to initialization function and timer function.
         $arg_list = array_merge (
             DEFAULT_ARGS_ADD,
-            isset($data['args']) ? $data['args'] : array()
+            isset($data['args']) ? $data['args'] : []
         );
-        $arg = array();
+        $arg = [];
         foreach($arg_list as $argument) {
             $arg[$argument] = $data[$argument];
         }
@@ -135,7 +135,7 @@ function task_onWorkerStart(Worker $worker) {
                     $send_data['task'] = $task_id;
                     //Send message to client.
                     Channel\Client::publish('send', $send_data);
-                }, array($arg, $task_id)
+                }, [$arg, $task_id]
             );
         else
             $timer_id = -1;
@@ -146,7 +146,7 @@ function task_onWorkerStart(Worker $worker) {
     Channel\Client::on ('set_'.$worker->id, function($data) use($worker) {
         //Data to be delivered to Configure function and timer function.
         $arg_list = array_merge(DEFAULT_ARGS_SET, $data['args']);
-        $arg = array();
+        $arg = [];
         foreach ($arg_list as $argument) {
             $arg[$argument] = $data[$argument];
         }
@@ -196,7 +196,7 @@ function http_onMessage(TcpConnection $connection) {
             //Set task_id.
             $task_id = uniqid();
             $request_data['task_id'] = $task_id;
-            $global->add($task_id, array());
+            $global->add($task_id, []);
             if(!isset($request_data['interval'])) {
                 //Never call timer function if not specified.
                 $request_data['interval'] = 0;
@@ -216,14 +216,14 @@ function http_onMessage(TcpConnection $connection) {
                 isset($request_data['return']) ? $request_data['return'] : array(),
                 DEFAULT_RETURN_ADD
             );
-            $return_data = array();
+            $return_data = [];
             foreach ($return_list as $return_msg) {
                 $return_data[$return_msg] = $request_data[$return_msg];
             }
-            $msg = array (
+            $msg = [
                 'type' => 'add',
                 'data' => $return_data
-            );
+            ];
             $connection->send(json_encode($msg));
             break;
         case 'set':
@@ -236,30 +236,29 @@ function http_onMessage(TcpConnection $connection) {
             Channel\Client::publish ('set_'.$request_data['worker_id'], $request_data);
             //Return data to Control Panel.
             $return_list = array_merge($request_data['return'], DEFAULT_RETURN_SET);
-            $return_data = array();
+            $return_data = [];
             foreach ($return_list as $return_msg) {
                 $return_data[$return_msg] = $request_data[$return_msg];
             }
-            $msg = array (
+            $msg = [
                 'type' => 'set',
                 'data' => $return_data
-            );
+            ];
             $connection->send(json_encode($msg));
-            break;
             break;
         case 'del':
             $worker_id = $request_data['worker_id'];
             $task_id = $request_data['task_id'];
             $task_name = $request_data['task_name'];
             Channel\Client::publish ('del_'.$worker_id, $request_data);
-            $msg = array (
+            $msg = [
                 'type' => 'del',
-                'data' => array (
+                'data' => [
                     'worker' => $worker_id,
                     'task' => $task_id,
                     'type' => $task_name
-                )
-            );
+                ]
+            ];
             $connection->send(json_encode($msg));
             break;
         case 'err':
@@ -267,9 +266,9 @@ function http_onMessage(TcpConnection $connection) {
     }
     return;
     err:
-    $msg = array (
+    $msg = [
         'type' => 'err',
         'data' => $request_data['err']
-    );
+    ];
     $connection->send(json_encode($msg));
 }
