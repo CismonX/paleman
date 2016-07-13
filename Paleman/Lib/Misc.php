@@ -80,3 +80,28 @@ function parse_request($request_str) {
     $request['operation'] = $operation;
     return $request;
 }
+/**
+ * Call on client connect.
+ * 
+ * @return mixed
+ */
+function ws_on_connect() {
+
+    //TODO: Send message on WebSocket connect. Send nothing if return true.
+
+    return true;
+}
+/**
+ * Verify client and attach client to task_id for receiving output.
+ * 
+ * @param mixed $request
+ * @param mixed $verify
+ * 
+ * @return array
+ */
+function ws_connection_verify($request, $verify) {
+
+    //TODO: Add some code here to verify user.
+
+    return $request['task_id'];
+}
