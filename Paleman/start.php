@@ -11,7 +11,9 @@ require_once WORKERMAN_PATH . '/Autoloader.php';
 $web_server = new WebServer('http://0.0.0.0:'.WEB_PORT);
 $web_server->count = 4;
 //Path for host documents.
-$web_server->addRoot('', WEB_PATH);
+foreach (WEB_PATHS as $root => $web_path){
+    $web_server->addRoot($root, $web_path);
+}
 
 //Initialize Channel Server
 $channel_server = new Channel\Server('0.0.0.0', CHANNEL_PORT);
