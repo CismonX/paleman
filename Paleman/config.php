@@ -1,5 +1,7 @@
 <?php
 
+//TODO: Modify constants to fit for project use.
+
 //Constants.
 define('WORKERMAN_PATH', __DIR__ . '/../Workerman');
 define('APPLICATION_PATH', __DIR__ . '/../Application');
@@ -20,6 +22,8 @@ define('DEFAULT_ARGS_ADD', []);
 define('DEFAULT_RETURN_ADD', ['task_id', 'interval', 'task_name']);
 define('DEFAULT_ARGS_SET', []);
 define('DEFAULT_RETURN_SET', ['task_name']);
+
+//TODO: User-created libs can be required here.
 
 //Require Paleman library.
 foreach (glob(__DIR__ . '/Lib/*.php') as $require_file) {
