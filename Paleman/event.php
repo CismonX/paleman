@@ -28,31 +28,29 @@ function ws_onWorkerStart(Worker $worker){
 
 function ws_onConnect(TcpConnection $connection) {
     $connection->task_id = null;
-    $msg = [
-        'type' => 'signal',
-        'data' => 'connected'
-    ];
+    $msg = ws_on_connect();
+    //Do not send message if return true.
+    if ($msg === true)
+        return;
+    //Close connection if error message is set;
+    if (isset($msg['err'])) {
+        $connection->close(json_encode($msg));
+        return;
+    }
     $connection->send(json_encode($msg));
 }
 
 function ws_onMessage(TcpConnection $connection, $data) {
     $data_arr = json_decode($data, true);
-    //Data format: 'request_str' => $request_str, 'verify_str' => $verify_str.
-    if (!isset($data_arr['request'])) {
+    //Data format: 'request' => request_str, 'verify' => verify_str.
+    if (!isset($data_arr['request']) || !isset($data_arr['verify'])) {
         $msg = [
             'type' => 'err',
             'data' => 'Invalid request.'
         ];
         goto Send;
     };
-    $request_data = $data_arr['request'];
-    if (is_callable('ws_connection_verify') && isset($data_arr['verify_str'])) {
-        $verify_data = $data_arr['verify_str'];
-        $verify = call_user_func('ws_connection_verify', $request_data, $verify_data);
-    } else {
-        echo "Warning: No verification function specified.\n";
-        $verify = $request_data;
-    }
+    $verify = ws_connection_verify($data_arr['request'], $data_arr['verify']);
     if (isset($verify['err'])) {
         $msg = [
             'type' => 'err',
@@ -64,8 +62,7 @@ function ws_onMessage(TcpConnection $connection, $data) {
     $connection->task_id = $verify['task_id'];
     $msg = [
         'type' => 'signal',
-        'data' => 'listen',
-        'id' => $connection->task_id
+        'data' => $verify['task_id']
     ];
     Send:
     $connection->send(json_encode($msg));
