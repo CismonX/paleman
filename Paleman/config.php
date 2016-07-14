@@ -4,7 +4,7 @@
 
 //Constants.
 define('WORKERMAN_PATH', __DIR__ . '/../Workerman');
-define('APPLICATION_PATH', __DIR__ . '/../Application');
+define('APPLICATION_PATH', __DIR__ . '/../Applications');
 define('WEB_PATHS', ['' => APPLICATION_PATH . '/web']);
 define('CONTROL_WORKER_COUNT', 4);
 define('TASK_WORKER_COUNT', 8);
