@@ -155,3 +155,8 @@ Please read the source code for more details about Paleman. Comments may help yo
 
 ## About Workerman
 
+As we had said before, Paleman is highly based on Workerman, so it's recommended that you master the usage of Workerman. See "http://workerman.net".
+
+## Support
+
+My email is admin@cismon.net. Please email me for tech support and demos.
