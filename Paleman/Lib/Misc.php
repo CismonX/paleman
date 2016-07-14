@@ -105,5 +105,5 @@ function ws_connection_verify($request, $verify) {
 
     //TODO: Add some code here to verify user.
 
-    return $request['task_id'];
+    return ['task_id' => $request['task_id']];
 }
