@@ -2,7 +2,7 @@
 
 ## Summary
 
-Paleman is a PHP framework based on Workerman, the latter is a open-source class library mainly for PHP socket programming. Paleman provides a convenient for developers to create RPC-like applications, which can be timed, distributed, and with many other features.
+Paleman is a PHP framework based on Workerman, the latter is a open-source class library mainly for PHP socket programming. Paleman provides a convenient way for developers to create RPC-like applications, which can be timed, distributed, and with many other features.
 
 ## Structure of Paleman
 
