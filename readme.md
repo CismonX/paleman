@@ -63,6 +63,7 @@ Add function should have only one argument. Return value should be a key-and-val
 * "worker\_id" => (int) : Specify task worker ID. If not set, Paleman will choose random worker.
 
 * "err" => (string) : Error messages. Can be set only when an error occurs and you want to abort the task. Initialize function and timer function will not be called, and error message will be sent to control panel.
+
 * Other members.
 
 Note:
@@ -107,4 +108,29 @@ Return value of a configure function should be a key-and-value array. The format
 * "set\_func" => (callable) : Set function, which will be further introduced in this document.
 
 * "worker\_id" => (int) : Specify task worker ID. If not set, Paleman will choose random worker.
+
+* Other members.
+
+## Set functions
+
+Set functions are called with the parameters given by the return value of Configure functions. No return value is required.
+
+Note that Set functions are called in Task workers.
+
+## Delete
+
+Terminate the specified running task according to the parameter "$task\_id" given by del operation. Before delete, function "$task\_name"+"\_on\_delete" will be called if exist. Pass "$task\_id" as parameter.
+
+Note that Paleman gets timer ID from GlobalData. Be aware of that if you must temper with it.
+
+## GlobalData
+
+PHP global variable can only be accessed from the same process. GlobalData Server stores data in its memory, and every worker can access GlobalData via socket, thus solves the problem.
+
+Paleman provides functions for quick access to GlobalData. See "Paleman/Lib/GlobalData.php" for details.
+
+If data is large or data operation is frequent, I suggest that you use redis or ssdb as alternative for GlobalData.
+
+Furthermore, shared memory (shm) is recommended for local data sharing for it's the quickest way for processes to exchange data. You may consider this when distributed deployment is not needed.
+
 ----to be continued
