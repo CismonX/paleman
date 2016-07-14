@@ -67,10 +67,12 @@ function parse_request($request_str) {
                 $request['err'] = "Task ID $request_arr[1] do not exist.";
                 break;
             }
-            $request['task_id'] = $request_arr[1];
-            $request['timer_id'] = $data['timer_id'];
-            $request['worker_id'] = $data['worker_id'];
-            $request['task_name'] = $data['task_name'];
+            $request = [
+                'task_id' => $request_arr[1],
+                'timer_id' => $data['timer_id'],
+                'worker_id' => $data['worker_id'],
+                'task_name' => $data['task_name']
+            ];
             break;
         default:
             $operation = 'err';
