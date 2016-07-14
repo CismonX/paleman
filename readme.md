@@ -133,4 +133,12 @@ If data is large or data operation is frequent, I suggest that you use redis or 
 
 Furthermore, shared memory (shm) is recommended for local data sharing for it's the quickest way for processes to exchange data. You may consider this when distributed deployment is not needed.
 
+## External Applications
+
+Paleman encapsulates PHP's program execution functions into class "Process" to provide developers with a convenient way to execute external applications (e.g. programs written in C) and interact with them via stdio.
+
+See "Paleman/Lib/Process.php" for details.
+
+Note that an external applications are executed as a child of the current process.
+
 ----to be continued
