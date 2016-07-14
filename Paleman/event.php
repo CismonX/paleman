@@ -78,10 +78,7 @@ function task_onWorkerStart(Worker $worker) {
     Channel\Client::on ('add_'.$worker->id, function($data) use($worker) {
         $task_id = $data['task_id'];
         //Data to be delivered to initialization function and timer function.
-        $arg_list = array_merge (
-            DEFAULT_ARGS_ADD,
-            isset($data['args']) ? $data['args'] : []
-        );
+        $arg_list = array_merge(DEFAULT_ARGS_ADD, isset($data['args']) ? $data['args'] : []);
         $arg = [];
         foreach($arg_list as $argument) {
             $arg[$argument] = $data[$argument];
@@ -142,7 +139,7 @@ function task_onWorkerStart(Worker $worker) {
     });
     Channel\Client::on ('set_'.$worker->id, function($data) use($worker) {
         //Data to be delivered to Configure function and timer function.
-        $arg_list = array_merge(DEFAULT_ARGS_SET, $data['args']);
+        $arg_list = array_merge(DEFAULT_ARGS_SET, isset($data['args']) ? $data['args'] : []);
         $arg = [];
         foreach ($arg_list as $argument) {
             $arg[$argument] = $data[$argument];
@@ -209,10 +206,7 @@ function http_onMessage(TcpConnection $connection) {
             }
             Channel\Client::publish ('add_'.$request_data['worker_id'], $request_data);
             //Return data to Control Panel.
-            $return_list = array_merge(
-                isset($request_data['return']) ? $request_data['return'] : array(),
-                DEFAULT_RETURN_ADD
-            );
+            $return_list = array_merge(DEFAULT_RETURN_ADD, isset($request_data['return']) ? $request_data['return'] : []);
             $return_data = [];
             foreach ($return_list as $return_msg) {
                 $return_data[$return_msg] = $request_data[$return_msg];
@@ -232,7 +226,7 @@ function http_onMessage(TcpConnection $connection) {
             if ($request_data['worker_id'])
             Channel\Client::publish ('set_'.$request_data['worker_id'], $request_data);
             //Return data to Control Panel.
-            $return_list = array_merge($request_data['return'], DEFAULT_RETURN_SET);
+            $return_list = array_merge(DEFAULT_RETURN_SET, isset($request_data['return']) ? $request_data['return'] : []);
             $return_data = [];
             foreach ($return_list as $return_msg) {
                 $return_data[$return_msg] = $request_data[$return_msg];
