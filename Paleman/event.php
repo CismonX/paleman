@@ -118,7 +118,7 @@ function task_onWorkerStart(Worker $worker) {
                     //User-defined timer function should have two arguments.
                     //The first is a user-defined array. The second is task_id, which can be used to access GlobalData.
                     $timer_func = getGlobalData($task_id, 'timer_func');
-                    if ($timer_func === null)
+                    if ($timer_func === false)
                         return;
                     if (!is_callable($timer_func)) {
                         echo "Error: Timer function not callable.\n";
@@ -150,7 +150,7 @@ function task_onWorkerStart(Worker $worker) {
         if (isset($data['set_func'])) {
             $set_func = $data['set_func'];
             if (!is_callable($set_func)) {
-                echo "Error: Configuration function not callable.\n";
+                echo "Error: Set function not callable.\n";
                 return;
             }
             call_user_func($set_func, $arg);
