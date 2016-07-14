@@ -141,4 +141,17 @@ See "Paleman/Lib/Process.php" for details.
 
 Note that an external applications are executed as a child of the current process.
 
-----to be continued
+## Verification
+
+* To verify users using the control panel, add some code in Add functions. Global variables "$\_SERVER" "$\_GET" "$\_POST" "$\_FILES" "$\_COOKIE" "$\_SESSION" "$\_REQUEST" are supported. However, you should use functions provided by Workerman to replace functions like "hearder()" "setcookie()", etc.
+
+* To verify users connected via WebSocket, modify function "ws\_connection\_verify" in "Paleman/Lib/Misc.php". If verification fails, set return value "err", then error message will be sent to user. If verification is successful, set return value "task_id" to specify the task which the user will listen to.
+
+## Others
+
+Please read the source code for more details about Paleman. Comments may help you better understand it.
+
+# Notes
+
+## About Workerman
+
