@@ -8,11 +8,11 @@ Paleman is a PHP framework based on Workerman, the latter is a open-source class
 
 A Paleman instance consists of a number of processes called workers, which are mainly devided into three types:
 
-* HTTP Workers listen to HTTP requests from control panel, parse the request, and give commands to Task Workers.
+* Control Workers listen to HTTP requests from control panel, parse the request, and give commands to Task Workers.
 
-* Task Workers execute the tasks and send messages to WebSocket Worker. They add new tasks, adjust or stop existing tasks according to the commands given by HTTP Workers.
+* Task Workers execute the tasks and send messages to Send Worker. They add new tasks, adjust or stop existing tasks according to the commands given by HTTP Workers.
 
-* WebSocket Workers recieve messages from Task Workers, and send them to the specified clients.
+* Send Workers recieve messages from Task Workers, and send them to the specified clients via WebSocket.
 
 Note that Channel servers and GlobalData servers are also workers, and they are used as agents for communication between processes.
 
@@ -68,7 +68,7 @@ Add function should have only one argument. Return value should be a key-and-val
 
 Note:
 
-* Add function is called in HTTP worker. Do not put tasks here.
+* Add functions are called in Control Workers. Do not put tasks here.
 
 * "$task_id" will be automatically added to the return value of add funtions.
 
@@ -91,11 +91,11 @@ Timer retrieves timer function from GlobalData every time it executes, thus it's
 
 Return value can be of any type. If not return true, it will be sent to client.
 
-Note that both timer functions and initialize functions are called in the same Task worker.
+Note that both timer functions and initialize functions are called in the same Task Worker.
 
 ## Configure functions
 
-Configure functions are independent from tasks, and they are called in HTTP workers when the control panel initiates a set operation. Normally, configure functions are used to modify the settings of current running tasks.
+Configure functions are independent from tasks, and they are called in Control Workers when the control panel initiates a set operation. Normally, configure functions are used to modify the settings of current running tasks.
 
 Function name should be "$func\_name"+"\_set", such as "user\_set". Parameter passing of configure functions is identical to that of add functions.
 
@@ -121,7 +121,11 @@ Note that Set functions are called in Task workers.
 
 Terminate the specified running task according to the parameter "$task\_id" given by del operation. Before delete, function "$task\_name"+"\_on\_delete" will be called if exist. Pass "$task\_id" as parameter.
 
-Note that Paleman gets timer ID from GlobalData. Be aware of that if you must temper with it.
+Note:
+
+* Paleman gets timer ID from GlobalData. Be aware of that if you must temper with it.
+
+* If the task you wish to terminate is blocked, it can not be immediately terminated. For this operation requires the same process with the target process. In that case, consider using set operation in another process.
 
 ## GlobalData
 
