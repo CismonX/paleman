@@ -5,6 +5,7 @@
 //Constants.
 define('WORKERMAN_PATH', __DIR__ . '/../Workerman');
 define('APPLICATION_PATH', __DIR__ . '/../Applications');
+define('TEMP_PATH', __DIR__ . '/../Temp');
 define('WEB_PATHS', ['' => APPLICATION_PATH . '/web']);
 define('CONTROL_WORKER_COUNT', 4);
 define('TASK_WORKER_COUNT', 8);
@@ -22,6 +23,9 @@ define('DEFAULT_ARGS_ADD', []);
 define('DEFAULT_RETURN_ADD', ['task_id', 'interval', 'task_name']);
 define('DEFAULT_ARGS_SET', []);
 define('DEFAULT_RETURN_SET', ['task_name']);
+define('LOG_FILE', TEMP_PATH . '/app.log');
+define('PID_FILE', TEMP_PATH . '/app.pid');
+define('STDOUT_FILE', '/dev/null');
 
 //TODO: User-created libs can be required here.
 
