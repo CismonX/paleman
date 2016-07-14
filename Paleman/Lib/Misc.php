@@ -17,7 +17,7 @@ function parse_request($request_str) {
     switch ($operation) {
         //Format: add <task_name> <argument_1> <argument_2> ...
         case 'add':
-            if (count($request_arr) < 3){
+            if (count($request_arr) < 2){
                 $operation = 'err';
                 $request['err'] = 'Invalid arguments.';
                 break;
@@ -36,14 +36,14 @@ function parse_request($request_str) {
             }
             $request['task_name'] = $task_name;
             break;
-        //Format: cfg <configure_type> <argument_1> <argument_2> ...
-        case 'cfg':
+        //Format: set <configure_type> <argument_1> <argument_2> ...
+        case 'set':
             if (count($request_arr) < 2) {
                 $operation = 'err';
                 $request['err'] = 'Invalid arguments.';
                 break;
             }
-            $func = $request_arr[1] . '_cfg';
+            $func = $request_arr[1] . '_set';
             if (!is_callable($func)) {
                 $operation = 'err';
                 $request['err'] = 'Configure function not callable.';
@@ -51,7 +51,7 @@ function parse_request($request_str) {
             }
             //Call user-defined function to parse configure request.
             $request = call_user_func($func, array_slice($request_arr, 2));
-            $request['task_name'] = $request_arr[1];
+            $request['cfg_name'] = $request_arr[1];
             break;
         //Format: del <task_id>
         case 'del':
@@ -82,7 +82,7 @@ function parse_request($request_str) {
 }
 /**
  * Call on client connect.
- * 
+ *
  * @return mixed
  */
 function ws_on_connect() {
@@ -93,10 +93,10 @@ function ws_on_connect() {
 }
 /**
  * Verify client and attach client to task_id for receiving output.
- * 
+ *
  * @param mixed $request
  * @param mixed $verify
- * 
+ *
  * @return array
  */
 function ws_connection_verify($request, $verify) {
