@@ -11,7 +11,7 @@ require_once WORKERMAN_PATH . '/Autoloader.php';
 $web_server = new WebServer('http://0.0.0.0:'.WEB_PORT);
 $web_server->count = 4;
 //Path for host documents.
-foreach (WEB_PATHS as $root => $web_path){
+foreach (WEB_PATHS as $root => $web_path) {
     $web_server->addRoot($root, $web_path);
 }
 
@@ -43,6 +43,7 @@ $ctrl_worker->name = 'Control Worker';
 $ctrl_worker->onWorkerStart = 'http_onWorkerStart';
 $ctrl_worker->onMessage = 'http_onMessage';
 
+//Output.
 Worker::$logFile = LOG_FILE;
 Worker::$pidFile = PID_FILE;
 Worker::$stdoutFile = STDOUT_FILE;
