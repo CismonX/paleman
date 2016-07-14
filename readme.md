@@ -31,7 +31,7 @@ Note:
 
 ## Add functions
 
-Each application has an add function to create a new instance.
+Each application has an add function to create a new instance, or we can say, a new task.
 
 Function name should be "$app\_name"+"\_add", such as "GithubSearch\_add". Add operation requires at lease two parameters, "add $app\_name $para\_3 $para\_4 ... $para\_n\>". The first argument "add" indicates the operation, the second specifies the application, all other arguments will be passed to the add function as one parameter (array).
 
@@ -45,7 +45,9 @@ Add function should have only one argument. Return value should be a key-and-val
 * "err" => (string) : Error messages. Can be set only when an error occurs and you want to abort the task. Initialize function and timer function will not be called, and error message will be sent to control panel.
 * Other members.
 
-Note that add function is called in HTTP worker. Do not put tasks here.
+Note:
+* Add function is called in HTTP worker. Do not put tasks here.
+* "$task_id" will be automatically added to the return value of add funtions.
 
 ## Initialize functions
 After an instance is successfully created, initialize function will be called.
@@ -67,6 +69,8 @@ Note that both timer functions and initialize functions are called in the same T
 
 ## Configure functions
 
-Configure functions are independent from tasks. 
+Configure functions are independent from tasks, and they are called in HTTP workers when the control panel initiates a set operation. Normally, configure functions are used to modify the settings of current running tasks.
+
+Function name should be "$func\_name"+"\_set", such as "user\_set". Parameter passing of configure functions is identical to that of add functions.
 
 ----to be continued
