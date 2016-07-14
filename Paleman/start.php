@@ -43,5 +43,9 @@ $ctrl_worker->name = 'Control Worker';
 $ctrl_worker->onWorkerStart = 'http_onWorkerStart';
 $ctrl_worker->onMessage = 'http_onMessage';
 
+Worker::$logFile = LOG_FILE;
+Worker::$pidFile = PID_FILE;
+Worker::$stdoutFile = STDOUT_FILE;
+
 //Start Workerman.
 Worker::runAll();
